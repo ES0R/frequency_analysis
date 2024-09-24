@@ -5,6 +5,13 @@ import matplotlib.pyplot as plt
 from scipy.fft import fft
 from misc import *
 
+########
+# TODO 
+# 1. Dynamically find out how many IMU, ACC and GYRO exist
+# 2. Make plots based on above
+# 3. Transmissiblity for ACC and Gyro
+# 4. RPi 
+
 IMU1 = ['Imu1Roll', 'Imu1Pitch', 'Imu1Yaw']
 IMU2 = ['Imu2Roll', 'Imu2Pitch', 'Imu2Yaw']
 ACC1 = ['ax1raw', 'ay1raw', 'az1raw']
