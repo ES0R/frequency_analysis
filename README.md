@@ -2,6 +2,8 @@
 
 This repo has the code to host a `Streamlit` app for visualizing frequency analysis. The app is hosted a static IP address where the hostdevice is a raspberry pi.
 
+Software from `olliw STorM32BGC NT` is being used in this project. Specfically, the ``NTLoggerTool``.  
+
 ## Usage
  
 Simply drag and drop your binary NT-log file for data visualization. The following plots will be generated:

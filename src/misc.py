@@ -4,6 +4,19 @@ import matplotlib.pyplot as plt
 from scipy.fft import fft
 from scipy.signal import welch
 from scipy.stats import gaussian_kde
+import pandas as pd
+from io import StringIO
+from owNTLog_v049 import cNTLogFileReader, cNTLogOptions
+
+def convert_ntlog_to_df(file):
+    # Example of parsing based on specific NTLOG structure
+    with open(file, 'r') as f:
+        # Read and process the NTLOG file structure here, e.g., line by line
+        # Adjust the delimiter or parsing based on the file format
+        data = f.readlines()  # Adjust based on actual content
+    # After processing, convert it to a DataFrame
+    df = pd.DataFrame(data)  # Adjust based on the actual data structure
+    return df
 
 def check_columns_in_csv(df):
     required_columns = ['Time', 'ax1raw', 'ax2raw', 'ay1raw', 'ay2raw', 'az1raw', 'az2raw', 'gx1raw', 'gx2raw', 'gy1raw', 'gy2raw', 'gz1raw']
@@ -14,6 +27,36 @@ def check_columns_in_csv(df):
     else:
         st.write("Missing columns:", missing_columns)
         return None
+
+class MockLoadLogThread:
+    def __init__(self):
+        self.canceled = False
+    
+    def emitProgress(self, value):
+        pass  # Do nothing or print progress if needed
+
+def read_ntlog_file(filepath):
+    log_reader = cNTLogFileReader()
+    
+    # Create a log options object and configure it as needed
+    log_options = cNTLogOptions()
+    log_options.createFullTraffic = True  # Example configuration
+    
+    # Use the mock thread to avoid the 'NoneType' error
+    mock_thread = MockLoadLogThread()
+    
+    # Read the log file with the specified log options
+    trafficlog, datalog, infolog, auxiliary_data, gyroflowlog = log_reader.readLogFile(mock_thread, filepath, log_options)
+    
+    # Combine datalog and return as a pandas DataFrame
+    data_lines = ''.join(datalog)  # datalog contains the log items as tab-separated lines
+    data_io = StringIO(data_lines)
+    
+    # Read as a tab-separated pandas DataFrame
+    df = pd.read_csv(data_io, delimiter='\t',low_memory=False)
+    df = df.apply(pd.to_numeric, errors='coerce')
+
+    return df
 
 def calculate_sampling_rate(df):
     time_diffs = np.diff(df['Time'])
@@ -59,7 +102,7 @@ def plot_psd(df, *args, sampling_rate, overlap):
             freqs, psd = welch(df[sensor_data], fs=sampling_rate)
             ax = axs[row_idx, col_idx] if num_rows > 1 else axs[col_idx]  # Correct subplot indexing
             ax.semilogy(freqs, psd, label=f'PSD of {sensor_data}', color=color[col_idx])
-            ax.set_xlim(0, 0.25)  # Adjust x-axis limit as needed or use max(freqs)
+            ax.set_xlim(0, np.max(freqs))
             ax.set_title(f'PSD of {sensor_data}')
             ax.set_xlabel('Frequency (Hz)')
             ax.set_ylabel('Power/Frequency (dB/Hz)')
