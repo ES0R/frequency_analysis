@@ -2,7 +2,7 @@ import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.fft import fft
-from scipy.signal import welch
+from scipy.signal import welch, butter, filtfilt, savgol_filter
 from scipy.stats import gaussian_kde
 import pandas as pd
 from io import StringIO
@@ -120,36 +120,73 @@ def calculate_rms(df, data):
         rms_values[col] = rms
     return rms_values
 
-def plot_prob(df, *args):
-    num_rows = len(args)
-    num_cols = len(args[0]) if args else 0
-    fig, axs = plt.subplots(num_rows, num_cols, figsize=(num_cols*6, num_rows*4))
-    colors = ['r', 'b', 'g', 'y', 'm', 'c']  # Extended color range for more sensors
+from scipy.stats import gaussian_kde
 
-    for row_idx, data_group in enumerate(args):
-        for col_idx, sensor_data in enumerate(data_group):
-            data_col = df[sensor_data] #.dropna()
-            kde = gaussian_kde(data_col, bw_method='scott')
-            x_vals = np.linspace(min(data_col), max(data_col), 500)  # Range based on actual data
-            y_vals = kde(x_vals)
+def plot_prob(df, imu1, imu2):
+    num_cols = len(imu1)  # Assuming IMU1 and IMU2 have the same length
+    fig, axs = plt.subplots(1, num_cols, figsize=(num_cols * 6, 4))
+    colors = ['g', 'r', 'b']  # Same colors for corresponding axes
 
-            ax = axs[row_idx, col_idx] if num_rows > 1 else axs[col_idx]
-            ax.plot(x_vals, y_vals, color=colors[col_idx % len(colors)], label=f'Probability Density of {sensor_data}')
-            ax.set_title(f'Probability Density of {sensor_data}')
-            ax.set_xlabel('Angle [o]')
-            ax.set_ylabel('Probability Density')
-            ax.grid(True)
-            ax.set_xscale('symlog')
-            ax.set_xlim(-100, 100)
+    for col_idx, (sensor_data_imu1, sensor_data_imu2) in enumerate(zip(imu1, imu2)):
+        # Data for IMU1
+        data_imu1 = df[sensor_data_imu1]
+        kde_imu1 = gaussian_kde(data_imu1, bw_method='scott')
+        x_vals_imu1 = np.linspace(min(data_imu1), max(data_imu1), 500)
+        y_vals_imu1 = kde_imu1(x_vals_imu1)
+
+        # Data for IMU2
+        data_imu2 = df[sensor_data_imu2]
+        kde_imu2 = gaussian_kde(data_imu2, bw_method='scott')
+        x_vals_imu2 = np.linspace(min(data_imu2), max(data_imu2), 500)
+        y_vals_imu2 = kde_imu2(x_vals_imu2)
+
+        # Plotting on the same axis
+        ax = axs[col_idx]
+        ax.plot(x_vals_imu1, y_vals_imu1, color=colors[col_idx % len(colors)], linestyle='-', label=f'{sensor_data_imu1}')
+        ax.plot(x_vals_imu2, y_vals_imu2, color=colors[col_idx % len(colors)], linestyle='--', label=f'{sensor_data_imu2}')
+
+        ax.set_title(f'Probability Density - {sensor_data_imu1} vs {sensor_data_imu2}')
+        ax.set_xlabel('Angle [°]')
+        ax.set_ylabel('Probability Density')
+        ax.grid(True)
+        ax.set_xscale('symlog')
+        ax.set_xlim(-100, 100)
+        ax.legend()
 
     plt.tight_layout()
     st.pyplot(fig)
 
+def apply_filter(data, filter_type, **kwargs):
 
-def plot_trans(df, data1, data2, sampling_rate):
-    num_pairs = len(data1)  # Assuming data1 and data2 have the same length and correspond to x, y, z, etc.
-    fig, axs = plt.subplots(1, num_pairs, figsize=(6 * num_pairs, 6))  # One row, multiple columns
-    colors = ['r', 'g', 'b']  # Colors for each subplot
+    if filter_type == 'savgol':
+        window_length = kwargs.get('window_length', 11)
+        polyorder = kwargs.get('polyorder', 2)
+        return savgol_filter(data, window_length=window_length, polyorder=polyorder)
+
+    elif filter_type == 'moving_average':
+        window_size = kwargs.get('window_size', 10)
+        return np.convolve(data, np.ones(window_size)/window_size, mode='same')
+
+    elif filter_type == 'bandpass':
+        low_cutoff = kwargs.get('low_cutoff', 0.1)
+        high_cutoff = kwargs.get('high_cutoff', 30.0)
+        sampling_rate = kwargs.get('sampling_rate', 1000)  # Hz
+        order = kwargs.get('order', 4)
+        
+        nyquist = 0.5 * sampling_rate
+        low = low_cutoff / nyquist
+        high = high_cutoff / nyquist
+        b, a = butter(order, [low, high], btype='band')
+        return filtfilt(b, a, data)
+    
+    else:
+        raise ValueError("Unsupported filter type. Choose from 'savgol', 'moving_average', or 'bandpass'.")
+
+
+def plot_trans(df, data1, data2, sampling_rate, filter_type='moving_average', cutoff_freq=10, filter_order=5, **filter_kwargs):
+    num_pairs = len(data1)
+    fig, axs = plt.subplots(1, num_pairs, figsize=(6 * num_pairs, 6))
+    colors = ['r', 'g', 'b']
 
     for i, (sensor1, sensor2) in enumerate(zip(data1, data2)):
         imu1_signal = df[sensor1] - np.mean(df[sensor1])
@@ -165,16 +202,23 @@ def plot_trans(df, data1, data2, sampling_rate):
         freq = np.fft.fftfreq(N, 1 / sampling_rate)[:N // 2]
         transmissibility = np.abs(imu2_fft[:N // 2]) / np.abs(imu1_fft[:N // 2])
 
-        ax = axs[i]  # Select the appropriate subplot
-        ax.plot(freq, transmissibility, label=f'{sensor1} to {sensor2}', color=colors[i], lw=2)
+        # Apply filter to the transmissibility data using the apply_filter function
+        filtered_transmissibility = apply_filter(transmissibility, filter_type, **filter_kwargs)
+
+        ax = axs[i]
+        # Plot original transmissibility with lower opacity
+        ax.plot(freq, transmissibility, label=f'{sensor1} to {sensor2} (Original)', color=colors[i], lw=2, alpha=0.3)
+        # Plot filtered transmissibility with full opacity
+        ax.plot(freq, filtered_transmissibility, label=f'{sensor1} to {sensor2} (Filtered)', color=colors[i], lw=2)
+
         ax.set_yscale('log')
         ax.set_xscale('log')
         ax.set_xlim(0, max(freq))
-        ax.set_ylim(min(transmissibility)/10, max(transmissibility)*10)
-        ax.grid(True, which='both', linestyle='-', linewidth=0.5)  # Set general grid properties
-        ax.minorticks_on()  # Enable minor ticks which are necessary for minor grid lines
-        ax.grid(True, which='major', linestyle='-', linewidth=0.5, color='gray')  # Customize major grid lines
-        ax.grid(True, which='minor', linestyle=':', linewidth=0.5, color='lightgray')  # Customize minor grid lines
+        ax.set_ylim(min(filtered_transmissibility) / 10, max(filtered_transmissibility) * 10)
+        ax.grid(True, which='both', linestyle='-', linewidth=0.5)
+        ax.minorticks_on()
+        ax.grid(True, which='major', linestyle='-', linewidth=0.5, color='gray')
+        ax.grid(True, which='minor', linestyle=':', linewidth=0.5, color='lightgray')
         ax.set_title(f'Transmissibility from {sensor1} to {sensor2}')
         ax.set_xlabel('Frequency (Hz)')
         ax.set_ylabel('Transmissibility')
@@ -182,4 +226,3 @@ def plot_trans(df, data1, data2, sampling_rate):
 
     plt.tight_layout()
     st.pyplot(fig)
-
