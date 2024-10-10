@@ -92,21 +92,28 @@ def plot_fft(df, *args, sampling_rate):
     st.pyplot(fig)
 
 
-def plot_psd(df, *args, sampling_rate, overlap):
-    num_rows = len(args)  # Number of rows based on the number of sensor groups passed
-    num_cols = len(args[0]) if args else 0  # Number of columns based on the number of elements in a sensor group
-    fig, axs = plt.subplots(num_rows, num_cols, figsize=(num_cols*6, num_rows*4))
-    color = ['r', 'g', 'b']
-    for row_idx, data_group in enumerate(args):
-        for col_idx, sensor_data in enumerate(data_group):
-            freqs, psd = welch(df[sensor_data], fs=sampling_rate)
-            ax = axs[row_idx, col_idx] if num_rows > 1 else axs[col_idx]  # Correct subplot indexing
-            ax.semilogy(freqs, psd, label=f'PSD of {sensor_data}', color=color[col_idx])
-            ax.set_xlim(0, np.max(freqs))
-            ax.set_title(f'PSD of {sensor_data}')
-            ax.set_xlabel('Frequency (Hz)')
-            ax.set_ylabel('Power/Frequency (dB/Hz)')
-            ax.grid(True)
+def plot_psd(df, imu1, imu2, sampling_rate):
+    num_cols = len(imu1)  # Assuming IMU1 and IMU2 have the same length
+    fig, axs = plt.subplots(1, num_cols, figsize=(num_cols * 6, 4))
+    colors = ['g', 'r', 'b']  # Same colors for corresponding axes
+
+    for col_idx, (sensor_data_imu1, sensor_data_imu2) in enumerate(zip(imu1, imu2)):
+        # PSD for IMU1
+        freqs_imu1, psd_imu1 = welch(df[sensor_data_imu1], fs=sampling_rate)
+        # PSD for IMU2
+        freqs_imu2, psd_imu2 = welch(df[sensor_data_imu2], fs=sampling_rate)
+
+        # Plotting on the same axis
+        ax = axs[col_idx]
+        ax.semilogy(freqs_imu1, psd_imu1, color=colors[col_idx % len(colors)], linestyle='-', label=f'{sensor_data_imu1}')
+        ax.semilogy(freqs_imu2, psd_imu2, color=colors[col_idx % len(colors)], linestyle='--', label=f'{sensor_data_imu2}')
+
+        ax.set_title(f'PSD - {sensor_data_imu1} vs {sensor_data_imu2}')
+        ax.set_xlabel('Frequency (Hz)')
+        ax.set_ylabel('Power/Frequency (dB/Hz)')
+        ax.grid(True)
+        ax.set_xlim(0, max(freqs_imu1))
+        ax.legend()
 
     plt.tight_layout()
     st.pyplot(fig)

@@ -19,7 +19,6 @@ GYRO1 = ['gx1raw', 'gy1raw', 'gz1raw']
 GYRO2 = ['gx2raw', 'gy2raw', 'gz2raw']
 
 st.set_page_config(
-    layout="wide",
     initial_sidebar_state="auto",
     page_title="Gimbal Performance Analysis",
 )
@@ -67,19 +66,27 @@ if uploaded_file is not None:
         plot_fft(df, ACC1, ACC2, sampling_rate=sampling_rate)
         progress_bar.progress(20)
 
+        # # Plot FFT GYRO
+        # st.write("## FFT GYRO")
+        # plot_fft(df, GYRO1, GYRO2, sampling_rate=sampling_rate)
+
+        # # Plot FFT IMU
+        # st.write("## FFT IMU")
+        # plot_fft(df, IMU1, IMU2, sampling_rate=sampling_rate)
+
         # Plot PSD ACC
         st.write("## PSD ACC")
-        plot_psd(df, ACC1, ACC2, sampling_rate=sampling_rate, overlap=True)
+        plot_psd(df, ACC1, ACC2, sampling_rate=sampling_rate)
         progress_bar.progress(30)
 
         # Plot PSD GYRO
         st.write("## PSD GYRO")
-        plot_psd(df, GYRO1, GYRO2, sampling_rate=sampling_rate, overlap=False)
+        plot_psd(df, GYRO1, GYRO2, sampling_rate=sampling_rate)
         progress_bar.progress(40)
 
         # Plot PSD IMU
         st.write("## PSD IMU")
-        plot_psd(df, IMU1, IMU2, sampling_rate=sampling_rate, overlap=False)
+        plot_psd(df, IMU1, IMU2, sampling_rate=sampling_rate)
         progress_bar.progress(50)
 
         # Calculate and display RMS values
