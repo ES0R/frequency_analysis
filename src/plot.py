@@ -45,7 +45,7 @@ if uploaded_file is not None:
 
         # Now pass the temporary file path to the read_ntlog_file function
         df = read_ntlog_file(temp_file_path)
-    
+    	st.write(f"Generating Plots")
     if df is not None:
         if df.iloc[0].isnull().all(): # Fixes none values at index 0 
             df.iloc[0] = 0

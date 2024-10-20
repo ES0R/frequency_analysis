@@ -87,3 +87,18 @@ ip=172.20.10.10::172.20.10.1:255.255.255.0:rpi:wlan0
 ```
 http://172.20.10.10:8501
 ```
+
+
+
+#  Fixed installtion (No completed)
+sudo apt install python3-pyqt5
+
+test
+python3 -c "from PyQt5.QtCore import QFile"
+
+source ~/venv/bin/activate
+
+test
+python3 -c "import PyQt5; print(PyQt5.__file__)"
+
+ln -s /usr/lib/python3/dist-packages/PyQt5 ~/venv/lib/python3.11/site-packages/
